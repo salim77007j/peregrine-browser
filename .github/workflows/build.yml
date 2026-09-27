@@ -22,7 +22,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             build-essential curl ca-certificates pkg-config git \
             libwebkitgtk-6.0-dev libgtk-4-dev libadwaita-1-dev \
-            xvfb xauth scrot xdotool \
+            xvfb xauth scrot \
             bubblewrap libseccomp2 shared-mime-info \
             fonts-noto-core fonts-noto-ui-core adwaita-icon-theme \
             file
@@ -52,33 +52,23 @@ jobs:
       - name: Screenshot tour (validation artifacts)
         run: |
           mkdir -p artifacts/shots
+          # --tour drives navigation deterministically; scrot captures each stage
           xvfb-run -a --server-args="-screen 0 1440x900x24" sh -c '
-            ./target/release/peregrine &
+            ./target/release/peregrine --tour &
             BPID=$!
-            sleep 14
+            sleep 8
             export DISPLAY=:99
-            WID=$(xdotool search --onlyvisible --name Peregrine | head -1)
             scrot -z artifacts/shots/01-newtab.png
-            xdotool key --window $WID ctrl+l
-            sleep 1
-            xdotool type --delay 20 "peregrine://privacy"
-            xdotool key Return
-            sleep 3
+            sleep 5
             scrot -z artifacts/shots/02-privacy.png
-            xdotool key ctrl+l
-            sleep 1
-            xdotool type --delay 20 "peregrine://settings"
-            xdotool key Return
-            sleep 3
+            sleep 5
             scrot -z artifacts/shots/03-settings.png
-            xdotool key ctrl+t
-            sleep 2
-            xdotool key ctrl+l
-            sleep 1
-            xdotool type --delay 20 "http://doubleclick.net/"
-            xdotool key Return
-            sleep 4
-            scrot -z artifacts/shots/04-blocked.png
+            sleep 5
+            scrot -z artifacts/shots/04-bookmarks.png
+            sleep 5
+            scrot -z artifacts/shots/05-history.png
+            sleep 5
+            scrot -z artifacts/shots/06-downloads.png
             kill $BPID || true
           ' || true
       - name: Resource measurement
