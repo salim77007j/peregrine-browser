@@ -108,7 +108,7 @@ jobs:
           mkdir -p dist
           cp target/release/peregrine dist/
           cp README.md ARCHITECTURE.md LICENSE dist/ 2>/dev/null || true
-          cd dist && tar czf peregrine-linux-amd64.tar.gz . && cd ..
+          tar czf /tmp/peregrine-linux-amd64.tar.gz -C dist . && mv /tmp/peregrine-linux-amd64.tar.gz dist/
       - name: Package (deb)
         run: |
           mkdir -p deb/DEBIAN deb/usr/local/bin deb/usr/share/doc/peregrine
