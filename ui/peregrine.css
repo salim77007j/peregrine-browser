@@ -1,0 +1,89 @@
+/* Peregrine browser chrome — GTK4 CSS layer over libadwaita */
+
+/* ---- omnibox pill ---- */
+.peregrine-omnibox {
+  border-radius: 999px;
+  background: alpha(currentColor, 0.05);
+  border: 1px solid alpha(currentColor, 0.08);
+  padding: 0 4px;
+  transition: all 150ms ease;
+}
+.peregrine-omnibox:focus-within {
+  background: alpha(currentColor, 0.08);
+  border-color: @accent_color;
+  box-shadow: 0 0 0 2px alpha(@accent_color, 0.25);
+}
+.peregrine-omnibox entry {
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  font-size: 105%;
+}
+.peregrine-omnibox entry:focus { border: none; box-shadow: none; }
+.peregrine-omni-sec { padding: 0 8px 0 10px; font-size: 95%; }
+.peregrine-omni-shield {
+  padding: 2px 10px;
+  margin: 4px 6px 4px 0;
+  border-radius: 8px;
+  background: alpha(@accent_color, 0.15);
+  color: @accent_color;
+  font-size: 85%;
+  font-weight: 700;
+}
+
+/* ---- toolbar ---- */
+.peregrine-toolbar { background: transparent; }
+.peregrine-nav { padding: 6px; }
+
+/* ---- tab strip ---- */
+.peregrine-tabbar { background: transparent; }
+.peregrine-newtab { margin: 2px 4px; }
+
+/* ---- bookmark bar ---- */
+.peregrine-bookmarkbar {
+  background: alpha(currentColor, 0.03);
+  border-top: 1px solid alpha(currentColor, 0.06);
+  padding: 2px 0;
+}
+.peregrine-bm-item { padding: 2px 10px; }
+
+/* ---- find bar ---- */
+.peregrine-findbar {
+  background: @window_bg_color;
+  border: 1px solid @borders;
+  border-radius: 12px;
+  padding: 6px 8px;
+  box-shadow: 0 6px 24px alpha(black, 0.35);
+}
+
+/* ---- status bar ---- */
+.peregrine-status {
+  background: alpha(black, 0.6);
+  color: white;
+  border-radius: 6px;
+  padding: 3px 10px;
+  margin: 8px;
+  font-size: 85%;
+  font-family: monospace;
+}
+
+/* ---- download badge ---- */
+.peregrine-badge-box { -gtk-icon-size: 1px; }
+.peregrine-badge {
+  background: @accent_color;
+  color: #0b0e14;
+  border-radius: 999px;
+  min-width: 18px;
+  padding: 1px 6px;
+  font-size: 70%;
+  font-weight: 800;
+  margin: -6px -2px 0 0;
+}
+
+/* ---- suggestions popover ---- */
+.peregrine-suggest row { border-radius: 8px; }
+.peregrine-suggest row:hover { background: alpha(currentColor, 0.06); }
+
+/* ---- sleeping tab placeholder ---- */
+.peregrine-sleeping { opacity: 0.55; font-size: 110%; }

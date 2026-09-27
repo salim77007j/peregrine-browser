@@ -1,0 +1,63 @@
+[package]
+name = "peregrine"
+version = "0.1.0"
+edition = "2021"
+description = "Peregrine — an ultra-fast, privacy-first web browser built in Rust"
+license = "MPL-2.0"
+repository = "https://github.com/salim77007j/peregrine-browser"
+keywords = ["browser", "privacy", "webkit", "gtk", "adblock"]
+categories = ["network-programming", "gui"]
+
+[[bin]]
+name = "peregrine"
+path = "src/main.rs"
+
+[dependencies]
+# UI toolkit (GTK 4.18 + libadwaita 1.7 via GObject introspection bindings)
+gtk4 = { version = "0.11", package = "gtk4", features = ["v4_18"] }
+glib = { version = "0.22", package = "glib" }
+libadwaita = { version = "0.9", package = "libadwaita", features = ["v1_7"] }
+# Web engine (WebKitGTK 6.0 / WebKit 2.52, multi-process, sandboxed)
+webkit6 = { version = "0.6", package = "webkit6", features = ["v2_52", "gtk_v4_18"] }
+
+# Data layer
+rusqlite = { version = "0.40", features = ["bundled"] }
+
+# Privacy engine (Brave's adblock engine)
+adblock = { version = "0.13", features = ["embedded-domain-resolver"] }
+
+# Serde / JSON
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+regex = "1"
+flate2 = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+base64 = "0.22"
+sha2 = "0.10"
+
+# Filtering proxy runtime (network-level ad/tracker blocking)
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros"] }
+
+# Filter list updater
+ureq = { version = "2", features = ["tls"] }
+
+# Password vault (AES-256-GCM + Argon2id)
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1

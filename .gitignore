@@ -1,0 +1,6 @@
+/target
+/assets/filters/*.txt
+/assets/filters/ubo-resources.json*
+/profile
+*.db
+*.log

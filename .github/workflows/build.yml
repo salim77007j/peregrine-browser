@@ -1,0 +1,141 @@
+name: Build & Verify
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build, test, verify, package
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            build-essential curl ca-certificates pkg-config git \
+            libwebkitgtk-6.0-dev libgtk-4-dev libadwaita-1-dev \
+            xvfb xauth scrot xdotool \
+            bubblewrap libseccomp2 shared-mime-info \
+            fonts-noto-core fonts-noto-ui-core adwaita-icon-theme \
+            file
+      - name: Install Rust
+        run: |
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: Build (release)
+        run: cargo build --release
+      - name: Unit tests
+        run: cargo test --release
+      - name: Headless end-to-end self-test
+        run: |
+          mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+          xvfb-run -a --server-args="-screen 0 1440x900x24" \
+            ./target/release/peregrine --self-test
+      - name: Screenshot tour (validation artifacts)
+        run: |
+          mkdir -p artifacts/shots
+          xvfb-run -a --server-args="-screen 0 1440x900x24" sh -c '
+            ./target/release/peregrine &
+            BPID=$!
+            sleep 14
+            export DISPLAY=:99
+            WID=$(xdotool search --onlyvisible --name Peregrine | head -1)
+            scrot -z artifacts/shots/01-newtab.png
+            xdotool key --window $WID ctrl+l
+            sleep 1
+            xdotool type --delay 20 "peregrine://privacy"
+            xdotool key Return
+            sleep 3
+            scrot -z artifacts/shots/02-privacy.png
+            xdotool key ctrl+l
+            sleep 1
+            xdotool type --delay 20 "peregrine://settings"
+            xdotool key Return
+            sleep 3
+            scrot -z artifacts/shots/03-settings.png
+            xdotool key ctrl+t
+            sleep 2
+            xdotool key ctrl+l
+            sleep 1
+            xdotool type --delay 20 "http://doubleclick.net/"
+            xdotool key Return
+            sleep 4
+            scrot -z artifacts/shots/04-blocked.png
+            kill $BPID || true
+          ' || true
+      - name: Resource measurement
+        run: |
+          mkdir -p artifacts
+          xvfb-run -a --server-args="-screen 0 1440x900x24" sh -c '
+            ./target/release/peregrine &
+            BPID=$!
+            sleep 12
+            ps -eo pid,ppid,pcpu,pmem,rss,comm --sort=-rss \
+              | grep -E "peregrine|WebKit" > artifacts/resource-usage.txt
+            TOTAL_RSS=$(ps -eo rss,comm | grep -E "peregrine|WebKit" | awk "{s+=\$1} END {print s}")
+            echo "total_rss_kb=$TOTAL_RSS" >> artifacts/resource-usage.txt
+            echo "--- idle CPU sample ---" >> artifacts/resource-usage.txt
+            top -b -n 2 -d 5 | grep -E "peregrine|WebKit" >> artifacts/resource-usage.txt
+            kill $BPID || true
+          ' || true
+          cat artifacts/resource-usage.txt || true
+      - name: Package (tar.gz)
+        run: |
+          mkdir -p dist
+          cp target/release/peregrine dist/
+          cp README.md ARCHITECTURE.md LICENSE dist/ 2>/dev/null || true
+          cd dist && tar czf peregrine-linux-amd64.tar.gz . && cd ..
+      - name: Package (deb)
+        run: |
+          mkdir -p deb/DEBIAN deb/usr/local/bin deb/usr/share/doc/peregrine
+          cp target/release/peregrine deb/usr/local/bin/
+          cp README.md ARCHITECTURE.md deb/usr/share/doc/peregrine/ 2>/dev/null || true
+          printf 'Package: peregrine\nVersion: %s\nSection: web\nPriority: optional\nArchitecture: amd64\nDepends: libwebkitgtk-6.0-0, libgtk-4-1, libadwaita-1-0, adwaita-icon-theme\nMaintainer: Peregrine Browser <salim77007j@users.noreply.github.com>\nDescription: Peregrine - the fastest browser on Earth. Privacy-first, built in Rust on WebKit.\n' "${GITHUB_REF_NAME#v}" > deb/DEBIAN/control
+          dpkg-deb --build --root-owner-group deb peregrine.deb && mv peregrine.deb dist/
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: peregrine-linux-amd64
+          path: dist/*
+      - name: Upload verification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: peregrine-verification
+          path: artifacts/*
+
+  release:
+    name: Release (tags)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: peregrine-linux-amd64
+          path: dist
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
