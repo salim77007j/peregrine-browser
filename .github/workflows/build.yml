@@ -114,7 +114,8 @@ jobs:
           mkdir -p deb/DEBIAN deb/usr/local/bin deb/usr/share/doc/peregrine
           cp target/release/peregrine deb/usr/local/bin/
           cp README.md ARCHITECTURE.md deb/usr/share/doc/peregrine/ 2>/dev/null || true
-          printf 'Package: peregrine\nVersion: %s\nSection: web\nPriority: optional\nArchitecture: amd64\nDepends: libwebkitgtk-6.0-0, libgtk-4-1, libadwaita-1-0, adwaita-icon-theme\nMaintainer: Peregrine Browser <salim77007j@users.noreply.github.com>\nDescription: Peregrine - the fastest browser on Earth. Privacy-first, built in Rust on WebKit.\n' "${GITHUB_REF_NAME#v}" > deb/DEBIAN/control
+          VERSION=$(printf '%s' "${GITHUB_REF_NAME#v}" | grep -E '^[0-9]' || echo '0.1.0')
+          printf 'Package: peregrine\nVersion: %s\nSection: web\nPriority: optional\nArchitecture: amd64\nDepends: libwebkitgtk-6.0-0, libgtk-4-1, libadwaita-1-0, adwaita-icon-theme\nMaintainer: Peregrine Browser <salim77007j@users.noreply.github.com>\nDescription: Peregrine - the fastest browser on Earth. Privacy-first, built in Rust on WebKit.\n' "$VERSION" > deb/DEBIAN/control
           dpkg-deb --build --root-owner-group deb peregrine.deb && mv peregrine.deb dist/
       - name: Upload binaries
         uses: actions/upload-artifact@v4
