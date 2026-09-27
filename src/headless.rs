@@ -110,8 +110,11 @@ pub fn run(app: Arc<App>) -> i32 {
         let elapsed = start.elapsed().as_secs();
         match *st {
             Step::NewTab => {
-                // verify new tab page rendered
+                // verify new tab page rendered (poll: slower machines take longer)
                 let title = win.current_title();
+                if (title.is_empty() || !title.contains("Peregrine")) && elapsed < 6 {
+                    return glib::ControlFlow::Continue; // still loading
+                }
                 let ok = title.contains("New tab") || title.contains("Peregrine");
                 rep.add("new-tab page", ok, format!("title='{}'", title));
                 // navigate to ad test
