@@ -23,7 +23,7 @@ jobs:
             build-essential curl ca-certificates pkg-config git \
             libwebkitgtk-6.0-dev libgtk-4-dev libadwaita-1-dev \
             xvfb xauth scrot \
-            bubblewrap libseccomp2 shared-mime-info \
+            bubblewrap libseccomp2 shared-mime-info dbus \
             fonts-noto-core fonts-noto-ui-core adwaita-icon-theme \
             file
       - name: Install Rust
@@ -45,11 +45,17 @@ jobs:
       - name: Unit tests
         run: cargo test --release
       - name: Headless end-to-end self-test
+        env:
+          # CI containers forbid unprivileged user namespaces, which WebKit's
+          # bubblewrap sandbox needs. Real desktops keep the sandbox enabled.
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
         run: |
           mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
           xvfb-run -a --server-args="-screen 0 1440x900x24" \
             ./target/release/peregrine --self-test
       - name: Screenshot tour (validation artifacts)
+        env:
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
         run: |
           mkdir -p artifacts/shots
           # --tour drives navigation deterministically; scrot captures each stage
@@ -72,6 +78,8 @@ jobs:
             kill $BPID || true
           ' || true
       - name: Resource measurement
+        env:
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
         run: |
           mkdir -p artifacts
           xvfb-run -a --server-args="-screen 0 1440x900x24" sh -c '
