@@ -86,12 +86,20 @@ jobs:
             ./target/release/peregrine &
             BPID=$!
             sleep 12
-            ps -eo pid,ppid,pcpu,pmem,rss,comm --sort=-rss \
-              | grep -E "peregrine|WebKit" > artifacts/resource-usage.txt
-            TOTAL_RSS=$(ps -eo rss,comm | grep -E "peregrine|WebKit" | awk "{s+=\$1} END {print s}")
-            echo "total_rss_kb=$TOTAL_RSS" >> artifacts/resource-usage.txt
-            echo "--- idle CPU sample ---" >> artifacts/resource-usage.txt
-            top -b -n 2 -d 5 | grep -E "peregrine|WebKit" >> artifacts/resource-usage.txt
+            {
+              echo "=== Peregrine process tree (pid ppid pcpu pmem rss_kb comm) ==="
+              ps -eo pid,ppid,pcpu,pmem,rss,comm | grep -E "peregrine|WebKit" || echo "(ps found nothing)"
+              echo "--- /proc-based RSS fallback ---"
+              for p in /proc/[0-9]*; do
+                comm=$(cat $p/comm 2>/dev/null) || continue
+                case "$comm" in
+                  peregrine*|WebKit*)
+                    rss=$(awk "/VmRSS/ {print \$2}" $p/status 2>/dev/null)
+                    echo "$p ${rss:-0} kB — $comm"
+                    ;;
+                esac
+              done
+            } > artifacts/resource-usage.txt || true
             kill $BPID || true
           ' || true
           cat artifacts/resource-usage.txt || true
