@@ -276,6 +276,40 @@ pub fn run(app: Arc<App>) -> i32 {
     0
 }
 
+
+/// Guided UI tour for external screenshot capture: navigates through the main
+/// pages with pauses, so a wrapper script can `scrot` each stage.
+pub fn run_tour(app: Arc<App>) {
+    println!("peregrine: tour starting (stages every 5s)");
+    let win = match crate::window_ops::open_new_window(&app, Some("peregrine://newtab")) {
+        Some(w) => w,
+        None => return,
+    };
+    let stages = [
+        "peregrine://newtab",
+        "peregrine://privacy",
+        "peregrine://settings",
+        "peregrine://bookmarks",
+        "peregrine://history",
+        "peregrine://downloads",
+    ];
+    let idx = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    glib::timeout_add_local(std::time::Duration::from_secs(5), {
+        let win = win.static_ref();
+        let stages: Vec<String> = stages.iter().map(|s| s.to_string()).collect();
+        let idx = idx.clone();
+        move || {
+            let i = idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if i >= stages.len() {
+                std::process::exit(0);
+            }
+            println!("peregrine: tour stage {i}: {}", stages[i]);
+            win.navigate(&stages[i]);
+            glib::ControlFlow::Continue
+        }
+    });
+}
+
 const AD_TEST_PAGE: &str = r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>AdBlock Test</title></head>
 <body>
 <h1>Ad-block test page</h1>

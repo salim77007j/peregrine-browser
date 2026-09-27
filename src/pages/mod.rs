@@ -29,7 +29,22 @@ pub const ROUTES: &[&str] = &[
     "newtab", "settings", "privacy", "bookmarks", "history", "downloads", "blocked", "error",
 ];
 
-pub fn register(app: Arc<App>, context: &WebContext) {
+/// Global app handle — the scheme handler must be registered BEFORE the
+/// NetworkSession exists (WebKitGTK routes scheme IPC per-network-process),
+/// while `Arc<App>` only materializes later.
+///
+/// Safety: the pointer is published once from the main thread before any view
+/// exists, and the scheme callback is only ever invoked on the GTK main thread.
+struct AppPtr(Arc<App>);
+unsafe impl Send for AppPtr {}
+unsafe impl Sync for AppPtr {}
+static APP: std::sync::OnceLock<AppPtr> = std::sync::OnceLock::new();
+
+pub fn publish_app(app: Arc<App>) {
+    let _ = APP.set(AppPtr(app));
+}
+
+pub fn register(context: &WebContext) {
     // Treat the scheme like a secure local document so fetch/XHR/mixed-content behave.
     let sm = context.security_manager().expect("security manager");
     sm.register_uri_scheme_as_secure("peregrine");
@@ -37,21 +52,30 @@ pub fn register(app: Arc<App>, context: &WebContext) {
     sm.register_uri_scheme_as_local("peregrine");
     sm.register_uri_scheme_as_no_access("peregrine");
 
-    context.register_uri_scheme("peregrine", move |request: &URISchemeRequest| {
-        let app = app.clone();
-        handle_request(app, request);
+    context.register_uri_scheme("peregrine", |request: &URISchemeRequest| {
+        if let Some(ptr) = APP.get() {
+            let app: Arc<App> = ptr.0.clone();
+            handle_request(app, request);
+        }
     });
 }
 
 fn handle_request(app: Arc<App>, request: &URISchemeRequest) {
     let uri = request.uri().map(|u| u.to_string()).unwrap_or_default();
-    let path = request
-        .path()
-        .unwrap_or_default()
-        .trim_matches('/')
+    // NOTE: for custom schemes WebKit parses `peregrine://privacy` with
+    // "privacy" as the URI *authority* (host), not the path — so we derive the
+    // route from the URI string itself.
+    let after_scheme = uri
+        .strip_prefix("peregrine://")
+        .or_else(|| uri.strip_prefix("peregrine:"))
+        .unwrap_or("");
+    let route_raw = after_scheme
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
         .to_string();
-    let path = crate::util::percent_decode(&path);
-    let route = path.split('/').next().unwrap_or("newtab").to_string();
+    let route = crate::util::percent_decode(&route_raw);
+    let route = if route.is_empty() { "newtab".to_string() } else { route };
     let query = uri.split_once('?').map(|(_, q)| q.to_string()).unwrap_or_default();
 
     let (html, mime) = match route.as_str() {

@@ -49,6 +49,7 @@ fn main() {
     let mut url: Option<String> = None;
     let mut new_window = false;
     let mut self_test = false;
+    let mut tour = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -62,6 +63,7 @@ fn main() {
                 return;
             }
             "--self-test" => self_test = true,
+            "--tour" => tour = true,
             "--new-window" => new_window = true,
             "--profile" => {
                 if i + 1 < args.len() {
@@ -78,7 +80,7 @@ fn main() {
     }
 
     // ---- bootstrap ----
-    if self_test {
+    if self_test || tour {
         // deterministic engine rules for the self-test (applied before engine build)
         std::env::set_var("PEREGRINE_SELFTEST", "1");
     }
@@ -113,9 +115,14 @@ fn main() {
             headless::run(app2.clone());
         });
     }
+    if tour {
+        let app2 = app.clone();
+        app.app.connect_activate(move |_| {
+            headless::run_tour(app2.clone());
+        });
+    }
 
     // ---- post-construction wiring ----
-    pages::register(app.clone(), &app.context);
     downloads::wire_hub(&app);
 
     // graceful shutdown on SIGINT/SIGTERM (glib 0.22 has no unix_signal_add;
@@ -137,8 +144,8 @@ fn main() {
         glib::ControlFlow::Continue
     });
 
-    // default activation: open/restore windows (skipped in self-test mode)
-    if !self_test {
+    // default activation: open/restore windows (skipped in self-test/tour modes)
+    if !self_test && !tour {
         let app3 = app.clone();
         app.app.connect_activate(move |_| {
             window_ops::activate(&app3);

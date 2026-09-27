@@ -37,17 +37,22 @@ pub fn create_view(win: &BrowserWindow, app: &Arc<App>) -> WebView {
     }});
 
     // --- privacy shields + cosmetic bootstrap ---
-    if let Some(script) = fp::shield_user_script(&prefs.fingerprint_shield) {
-        ucm.add_script(&script);
+    let no_scripts = std::env::var("PEREGRINE_NO_SCRIPTS").is_ok();
+    if !no_scripts {
+        if let Some(script) = fp::shield_user_script(&prefs.fingerprint_shield) {
+            ucm.add_script(&script);
+        }
     }
-    let cosmetic = UserScript::new(
-        &fp::cosmetic_bootstrap_script(),
-        UserContentInjectedFrames::AllFrames,
-        UserScriptInjectionTime::Start,
-        &[],
-        &[],
-    );
-    ucm.add_script(&cosmetic);
+    if !no_scripts {
+        let cosmetic = UserScript::new(
+            &fp::cosmetic_bootstrap_script(),
+            UserContentInjectedFrames::AllFrames,
+            UserScriptInjectionTime::Start,
+            &[],
+            &[],
+        );
+        ucm.add_script(&cosmetic);
+    }
 
     // --- cosmetic filtering replies (generic selectors) ---
     ucm.connect_script_message_received(
@@ -77,17 +82,28 @@ pub fn create_view(win: &BrowserWindow, app: &Arc<App>) -> WebView {
     }});
 
     // register the handler names (after all connections)
-    let _ = ucm.register_script_message_handler("bridge", None::<&str>);
-    let _ = ucm.register_script_message_handler("cosmetic", None::<&str>);
-    let _ = ucm.register_script_message_handler("shields", None::<&str>);
+    if !no_scripts {
+        let _ = ucm.register_script_message_handler("bridge", None::<&str>);
+        let _ = ucm.register_script_message_handler("cosmetic", None::<&str>);
+        let _ = ucm.register_script_message_handler("shields", None::<&str>);
+    }
 
     // --- the view itself ---
-    let view = WebView::builder()
-        .web_context(&app.context)
-        .network_session(&app.session)
-        .user_content_manager(&ucm)
-        .settings(&app.settings)
-        .build();
+    let use_default_session = std::env::var("PEREGRINE_DEFAULT_SESSION").is_ok();
+    let view = if use_default_session {
+        WebView::builder()
+            .web_context(&app.context)
+            .user_content_manager(&ucm)
+            .settings(&app.settings)
+            .build()
+    } else {
+        WebView::builder()
+            .web_context(&app.context)
+            .network_session(&app.session)
+            .user_content_manager(&ucm)
+            .settings(&app.settings)
+            .build()
+    };
 
     wire_view(&view, win, &app);
     view
@@ -235,6 +251,7 @@ fn wire_view(view: &WebView, win: &BrowserWindow, app: &Arc<App>) {
     );
 
     // ---------- policy decisions (navigation, new window, downloads) ----------
+    if std::env::var("PEREGRINE_NO_POLICY").is_err() {
     view.connect_decide_policy({ let win = win.static_ref(); let app = app.clone(); move |_v, decision, dtype| {
         let mut handled = false;
         match dtype {
@@ -286,6 +303,7 @@ fn wire_view(view: &WebView, win: &BrowserWindow, app: &Arc<App>) {
         }
         handled
     } });
+    }
 
     // ---------- new tab / window creation ----------
     view.connect_create({ let win = win.static_ref(); let app = app.clone(); move |_v, _action| {

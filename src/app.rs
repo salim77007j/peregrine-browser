@@ -47,6 +47,10 @@ impl App {
         let privacy = Arc::new(PrivacyManager::new(&prefs));
         privacy.start();
 
+        // ---- WebKit context (scheme handlers must exist before any NetworkSession) ----
+        let context = WebContext::new();
+        crate::pages::register(&context);
+
         // ---- WebKit: website data + network session ----
         let base_data = profile.join("webkit-data");
         let cache = profile.join("cache");
@@ -60,8 +64,12 @@ impl App {
         }
 
         // routing through the filtering proxy (loopback only; loopback test servers bypass)
+        let no_proxy = std::env::var("PEREGRINE_NO_PROXY").is_ok();
         let mut configured = false;
         for _ in 0..50 {
+            if no_proxy {
+                break;
+            }
             if let Some(addr) = privacy.proxy_addr() {
                 let settings = NetworkProxySettings::new(Some(&addr), &["127.0.0.1", "localhost", "0.0.0.0"]);
                 session.set_proxy_settings(NetworkProxyMode::Custom, Some(&settings));
@@ -75,9 +83,6 @@ impl App {
             eprintln!("peregrine: filtering proxy unavailable — traffic flows unfiltered");
         }
 
-        // ---- WebKit context ----
-        let context = WebContext::new();
-        // (the peregrine:// scheme is registered in main.rs after App construction)
 
         // ---- shared settings ----
         let settings = build_webkit_settings(&prefs);
@@ -106,6 +111,9 @@ impl App {
 
         // sentinel for crash detection (session restore prompt)
         let _ = std::fs::write(&app.sentinel, std::process::id().to_string());
+
+        // publish for the peregrine:// scheme handler
+        crate::pages::publish_app(app.clone());
 
         app
     }
